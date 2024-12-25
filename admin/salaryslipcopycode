@@ -1,0 +1,139 @@
+<?php
+require('fpdf/fpdf.php'); // Include FPDF library
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['employee_id'])) {
+    $employeeId = $_POST['employee_id'];
+
+    // Fetch employee attendance details
+    include '../dbconnection.php';
+    $sql = "SELECT *, 
+                   TIMESTAMPDIFF(MINUTE, in_time, out_time) AS worked_minutes, 
+                   TIME(in_time) AS in_time_only,
+                   TIME(out_time) AS out_time_only 
+            FROM employee_attendance 
+            WHERE emp_id = '$employeeId'";
+    $result = $conn->query($sql);
+
+    // Initialize variables
+    $fullDays = 0;
+    $halfDays = 0;
+    $lateMarks = 0;
+    $totalMinutesWorked = 0;
+
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $workedMinutes = $row['worked_minutes'] ?? 0;
+            $inTime = $row['in_time_only'] ?? '00:00:00';
+            $outTime = $row['out_time_only'] ?? '00:00:00';
+            $totalMinutesWorked += $workedMinutes;
+
+            // Calculate full day, half day, or late mark
+            if ($workedMinutes >= 525) { // 8:45 hours in minutes
+                $fullDays++;
+            } elseif ($workedMinutes >= 240 && $workedMinutes <= 480) { // 4 to 8 hours in minutes
+                $halfDays++;
+            }
+
+            // Check for late mark based on out time between 5:30 PM and 6:30 PM
+            $outTimeTimestamp = strtotime($outTime);
+            $lateStart = strtotime('17:30:00'); // 5:30 PM
+            $lateEnd = strtotime('18:30:00'); // 6:30 PM
+
+            if ($outTimeTimestamp >= $lateStart && $outTimeTimestamp <= $lateEnd) {
+                $lateMarks++;
+            }
+
+            // Check for late mark if in time is after 9:45 AM
+            if (strtotime($inTime) > strtotime('09:45:00')) {
+                $lateMarks++;
+            }
+        }
+
+        // Calculate additional half days for late marks during salary calculation
+        $adjustedHalfDays = $halfDays + intdiv($lateMarks, 3);
+
+        // Calculate total days worked for salary calculation
+        $totalDaysWorked = $fullDays + ($adjustedHalfDays / 2);
+
+        // Fetch employee details
+        $employeeSql = "SELECT * FROM new_employee WHERE id='$employeeId'";
+        $employeeResult = $conn->query($employeeSql);
+        $employee = $employeeResult->fetch_assoc();
+
+        // Validate fetched data
+        $employeeName = $employee['name'] ?? 'N/A';
+        $employeeDesignation = $employee['designation'] ?? 'N/A';
+        $employeeID = $employee['emp_id'] ?? 'N/A';
+        $monthlySalary = $employee['salary'] ?? 0;
+        $payMode = $employee['pay_mode'] ?? 'N/A';
+
+        // Calculate daily rate and total salary
+        $dailyRate = $monthlySalary / 23; // Assuming 23 working days in a month
+        $totalSalary = $totalDaysWorked * $dailyRate;
+
+        // Create PDF
+        $pdf = new FPDF();
+        $pdf->AddPage();
+        $pdf->SetFont('Arial', 'B', 16);
+
+        // Title
+        $pdf->Cell(190, 10, 'Salary Slip for October 2024', 0, 1, 'C');
+        $pdf->Ln(10);
+
+        // Employee Details
+        $pdf->SetFont('Arial', '', 12);
+        $pdf->Cell(50, 10, 'Name:', 0, 0);
+        $pdf->Cell(50, 10, $employeeName, 0, 1);
+
+        $pdf->Cell(50, 10, 'EMP ID:', 0, 0);
+        $pdf->Cell(50, 10, $employeeID, 0, 1);
+
+        $pdf->Cell(50, 10, 'Designation:', 0, 0);
+        $pdf->Cell(50, 10, $employeeDesignation, 0, 1);
+
+        $pdf->Cell(50, 10, 'Pay Mode:', 0, 0);
+        $pdf->Cell(50, 10, $payMode, 0, 1);
+
+        $pdf->Ln(10);
+
+        // Salary Calculation
+        $pdf->SetFont('Arial', 'B', 14);
+        $pdf->Cell(190, 10, 'Salary Details', 0, 1, 'C');
+        $pdf->Ln(5);
+
+        $pdf->SetFont('Arial', '', 12);
+        $pdf->Cell(50, 10, 'Monthly Salary:', 0, 0);
+        $pdf->Cell(50, 10, 'Rs. ' . number_format($monthlySalary, 2), 0, 1);
+
+        $pdf->Cell(50, 10, 'Full Days:', 0, 0);
+        $pdf->Cell(50, 10, $fullDays . ' days', 0, 1);
+
+        $pdf->Cell(50, 10, 'Half Days:', 0, 0);
+        $pdf->Cell(50, 10, $halfDays . ' days', 0, 1);
+
+        $pdf->Cell(50, 10, 'Late Marks:', 0, 0);
+        $pdf->Cell(50, 10, $lateMarks . ' late marks', 0, 1);
+
+        $pdf->Ln(5);
+
+        $pdf->Cell(50, 10, 'Adjusted Total Days:', 0, 0);
+        $pdf->Cell(50, 10, number_format($totalDaysWorked, 2) . ' days', 0, 1);
+
+        $pdf->Cell(50, 10, 'Total Salary:', 0, 0);
+        $pdf->Cell(50, 10, 'Rs. ' . number_format($totalSalary, 2), 0, 1);
+
+        // Output PDF
+        ob_end_clean(); // Clean any output buffer before generating the PDF
+        $pdf->Output();
+    } else {
+        // Clear any output and display an error message
+        ob_end_clean();
+        echo 'No attendance data found.';
+    }
+} else {
+    // Clear any output and display an error message
+    ob_end_clean();
+    echo "Invalid Request";
+}
+
+?>
