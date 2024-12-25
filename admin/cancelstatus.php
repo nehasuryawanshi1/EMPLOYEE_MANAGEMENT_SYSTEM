@@ -13,7 +13,7 @@ $plant_id = isset($_GET['plant_id']) ? intval($_GET['plant_id']) : 0;
 $sql = "UPDATE buy 
         SET approval_status='cancelled' 
         WHERE id=? AND user_id=? AND maincategory=? AND product_id=? AND subproduct_id=? AND plant_id=?";
-
+vvvvvvvvvvvvvvvvvvvvvvv
 // Create a prepared statement
 if ($stmt = mysqli_prepare($conn, $sql)) {
     // Bind parameters

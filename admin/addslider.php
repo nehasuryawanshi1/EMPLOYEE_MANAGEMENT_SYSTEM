@@ -6,7 +6,6 @@ if (empty($_SESSION['admin_session'])) {
 ?>
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0">
@@ -99,7 +98,7 @@ if (empty($_SESSION['admin_session'])) {
     <script type="text/javascript" src="assets/ckeditor/ckeditor.js"></script>
     <!-- Scripts  -->
     <script src="assets/js/jquery-3.5.1.min.js"></script>
-
+<!-- <script src="assets/js/jquery-ui.min.js"></script> -->
     <script src="assets/js/popper.min.js"></script>
     <script src="assets/plugins/bootstrap/js/bootstrap.min.js"></script>
 
